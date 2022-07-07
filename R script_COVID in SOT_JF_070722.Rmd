@@ -1,0 +1,418 @@
+#load sample tsv file to R Studio
+
+data <- read.delim("~/Desktop/COVID TCR in SOT/CombinedRearrangements_12-27-2021_templates_bioidentity_JF.tsv")
+
+#definition of parameters with funtions
+
+#clonality
+cloneCal <- function(array) {
+  x = array[array >0 ] / sum(array)
+  #  x = sort(array, decreasing=T)
+  l = length(x)
+  entropy = sum(x * -1 * log2(x))
+  maxentropy = -log2(1/l)
+  return(signif(1 - entropy / maxentropy, 2))
+}
+
+#R20
+getR20<-function(column,rval=0.2){
+  column=column/sum(column)
+  column=column[order(column,decreasing = T)]
+  column=column[column>0]
+  num=0
+  total=0
+  while(total<rval){
+    total=total+column[num+1]
+    num=num+1
+  }
+  return(num/length(column))
+}
+
+#JSD
+
+jsdReport<-function(data, topN=-1)
+{
+  out<-matrix(nrow=ncol(data),ncol=ncol(data), dimnames=list(colnames(data), colnames(data)))
+  for(i in 1:ncol(data)){
+    for(j in 1:ncol(data)){
+      if(topN==-1){
+        out[i,j]<-jensen_shannon(data[,i], data[,j])
+      }
+      else{
+        a<-order(data[,i],decreasing=TRUE)[1:topN]
+        b<-order(data[,j],decreasing=TRUE)[1:topN]
+        z<-data[union(a,b),]
+        out[i,j]<-jensen_shannon(z[,i],z[,j])
+      }
+    }
+  }
+  return(out)
+}
+
+shannon.entropy <- function(p)
+{
+  if (min(p) < 0 || sum(p) <= 0)
+    return(NA)
+  p.norm <- p[p>0]/sum(p)
+  -sum(log2(p.norm)*p.norm)
+}
+
+cloneCal <- function(p) {
+  x = p[p>0] / sum(p)
+  l = length(x)
+  entropy = shannon.entropy(p)
+  maxentropy = -log2(1/l)
+  return(signif(1 - entropy / maxentropy, 2)) }
+
+jensen_shannon <- function(p, q){
+  ## JSD = H(0.5 *(p +q)) - 0.5H(p) - 0.5H(q)
+  # H(X) = \sum x_i * log2(x_i)
+  #  p = p[p >0 & q >0]
+  #  q = q[p>0 & q>0]
+  p = p / sum(p)
+  q = q / sum(q)
+  Hj = shannon.entropy(0.5 *(p+q)) 
+  Hp = shannon.entropy(p) 
+  Hq = shannon.entropy(q)
+  
+  jsd = Hj - 0.5*(Hp+Hq)
+  #	cat(Hj, Hp, Hq, jsd, "\n")
+  return(jsd)
+}
+
+
+#show column names
+names(data)
+[1] "Bioidentity"                     "Sum..Templates."                 "Present.In"                     
+ [4] "Pt01_Ax_LiTx_Heart"              "Pt01_Ax_LiTx_Kidney"             "Pt01_Ax_LiTx_Kidney.Liver"      
+ [7] "Pt01_Ax_LiTx_Liver_Allo"         "Pt01_Ax_LiTx_Lung"               "Pt02_Ax_LuTx_Heart"             
+[10] "Pt02_Ax_LuTx_Kidney.Liver"       "Pt02_Ax_LuTx_Lung_Allo"          "Pt02_Ax_LuTx_Lung_Native"       
+[13] "Pt03_Ax_KTx_Heart"               "Pt03_Ax_KTx_Kidney_Allo"         "Pt03_Ax_KTx_Kidney_Native.Liver"
+[16] "Pt03_Ax_KTx_Lung"                "Pt04_Ax_KTx_Heart"               "Pt04_Ax_KTx_Kidney_Allo"        
+[19] "Pt04_Ax_KTx_Kidney_Native"       "Pt04_Ax_KTx_Liver"               "Pt04_Ax_KTx_Lung"               
+[22] "Pt05_Ax_HTx_Heart_Allo"          "Pt05_Ax_HTx_Kidney"              "Pt05_Ax_HTx_Liver"              
+[25] "Pt05_Ax_HTx_Lung"                "Pt06_Ax_KTx_Heart"               "Pt06_Ax_KTx_Kidney_Allo"        
+[28] "Pt06_Ax_KTx_Kidney_Native"       "Pt06_Ax_KTx_Liver"               "Pt06_Ax_KTx_Lung"               
+[31] "Pt07_Bx_KTx_POD387"              "Pt08_Bx_KTx_POD159"              "Pt09_Bx_KTx_POD41"              
+[34] "Pt10_Bx_KTx_POD130"              "Pt11_Bx_KTx_POD175"              "Pt12_Bx_KTx_POD152"             
+[37] "Pt13_Bx_HTx_POD451"              "Pt14_Bx_HTx_POD619"  
+
+
+
+###unique sequences
+
+#how many unique sequences are in each column?
+apply(data[,c(4:38)],2, function(data){length(which(data>0))})
+
+
+#generate data matrix
+matrix<-apply(data[,c(4:38)],2, function(data){length(which(data>0))})
+
+write.table(matrix,file ="~/Desktop/COVID TCR in SOT/R results/unique sequences.tsv",quote=F,row.names=T,col.names=T, sep="\t")
+
+
+
+###total template counts
+
+#how many total template counts are in each column?
+apply(data[,c(4:38)],2,sum)
+
+#generate data matrix
+matrix<-apply(data[,c(4:38)],2, sum)
+write.table(matrix,file ="~/Desktop/COVID TCR in SOT/R results/total template counts.tsv",quote=F,row.names=T,col.names=T, sep="\t")
+
+
+###cloneCal
+
+#what is the clonality for each column?
+apply(data[,c(4:38)],2, cloneCal)
+
+#generate data matrix
+matrix<-apply(data[,c(4:38)],2, cloneCal)
+write.table(matrix,file ="~/Desktop/COVID TCR in SOT/R results/clonality.tsv",quote=F,row.names=T,col.names=T, sep="\t")
+
+
+
+###getR20
+
+#what is the clonality for each column?
+apply(data[,c(4:38)],2, getR20)
+
+#generate data matrix
+matrix<-apply(data[,c(4:38)],2, getR20)
+write.table(matrix,file ="~/Desktop/COVID TCR in SOT/R results/R20.tsv",quote=F,row.names=T,col.names=T, sep="\t")
+
+
+#individual clonal frequency in sample of column 7
+freqlist=data[,7] / sum(data[,7])
+
+write.table(freqlist,file ="~/Desktop/COVID TCR in SOT/R results/Pt01_Ax_LiTx_Liver_Allo freqlist.tsv",quote=F,row.names=T,col.names=F, sep="\t")
+
+
+#jsd all samples all sequences
+jsdReport(data[,c(4:38)])
+
+write.table(jsdReport(data[,c(4:38)]),file ="~/Desktop/COVID TCR in SOT/R results/jsdReport all samples all sequences.tsv",quote=F,row.names=T,col.names=T, sep="\t")
+
+
+
+
+## input data for GLIPH2 analysis in reference to MIRA SARS-CoV-2 dataset
+
+library(devtools)
+library("navdata")
+library(tidyverse)
+library(igraph)
+library(reshape2)
+
+
+#integrated table
+
+MIRA.Sars.Cov2.combined_remove.unproductive <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/MIRA Sars-Cov2 combined_remove unproductive.csv")
+
+MIRA.Sars.Cov2 <- unique(MIRA.Sars.Cov2.combined_remove.unproductive)
+
+productive.frequency <- read.delim("~/Desktop/COVID TCR in SOT/CombinedRearrangements_12-27-2021_productive frequency_bioidentity_JF.tsv")
+
+
+productive.frequency <- left_join(productive.frequency, MIRA.Sars.Cov2)
+
+#Joining, by = "bio_identity"
+
+COVID19.associated <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/COVID search tool.csv")
+
+COVID19.associated <- unique(COVID19.associated)
+
+productive.frequency <- left_join(productive.frequency, COVID19.associated)
+#Joining, by = "bio_identity"
+
+peptide.detail.ci <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/peptide-detail-ci_V2.csv")
+peptide.detail.ci <- unique(peptide.detail.ci)
+
+
+productive.frequency <- left_join(productive.frequency, peptide.detail.ci)
+
+#Joining, by = "bio_identity"
+
+subject.metadata <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/ImmuneCODE-MIRA-Release002.1/subject-metadata.csv")
+
+productive.frequency <- left_join(productive.frequency, subject.metadata)
+
+Joining, by = "Experiment"
+
+
+write.table(productive.frequency,file ='~/Desktop/GLIPH2/COVID in SOT GLIPH2/integrated all.tsv',quote=F,row.names=F,col.names=T, sep="\t")
+
+
+
+#read table 
+COVID.in.SOT_01022022 <- read.delim("~/Desktop/GLIPH2/COVID in SOT GLIPH2/RearrangementDetails_01-02-2022_COVID in SOT.tsv")
+
+levels(factor(COVID.in.SOT_01022022$sample_name))
+[1] "Pt01_Ax_LiTx_Heart"              "Pt01_Ax_LiTx_Kidney"             "Pt01_Ax_LiTx_Kidney+Liver"      
+[4] "Pt01_Ax_LiTx_Liver_Allo"         "Pt01_Ax_LiTx_Lung"               "Pt02_Ax_LuTx_Heart"             
+[7] "Pt02_Ax_LuTx_Kidney+Liver"       "Pt02_Ax_LuTx_Lung_Allo"          "Pt02_Ax_LuTx_Lung_Native"       
+[10] "Pt03_Ax_KTx_Heart"               "Pt03_Ax_KTx_Kidney_Allo"         "Pt03_Ax_KTx_Kidney_Native+Liver"
+[13] "Pt03_Ax_KTx_Lung"                "Pt04_Ax_KTx_Heart"               "Pt04_Ax_KTx_Kidney_Allo"        
+[16] "Pt04_Ax_KTx_Kidney_Native"       "Pt04_Ax_KTx_Liver"               "Pt04_Ax_KTx_Lung"               
+[19] "Pt05_Ax_HTx_Heart_Allo"          "Pt05_Ax_HTx_Kidney"              "Pt05_Ax_HTx_Liver"              
+[22] "Pt05_Ax_HTx_Lung"                "Pt06_Ax_KTx_Heart"               "Pt06_Ax_KTx_Kidney_Allo"        
+[25] "Pt06_Ax_KTx_Kidney_Native"       "Pt06_Ax_KTx_Liver"               "Pt06_Ax_KTx_Lung"               
+[28] "Pt07_Bx_KTx_POD387"              "Pt08_Bx_KTx_POD159"              "Pt09_Bx_KTx_POD41"              
+[31] "Pt10_Bx_KTx_POD130"              "Pt11_Bx_KTx_POD175"              "Pt12_Bx_KTx_POD152"             
+[34] "Pt13_Bx_HTx_POD451"              "Pt14_Bx_HTx_POD619" 
+
+#use Pt03_Ax_KTx sample as demo
+Pt03_Ax_KTx <- COVID.in.SOT_01022022[COVID.in.SOT_01022022$sample_name %in% c("Pt03_Ax_KTx_Heart","Pt03_Ax_KTx_Kidney_Allo","Pt03_Ax_KTx_Kidney_Native+Liver", "Pt03_Ax_KTx_Lung"), c("sample_name","templates", "amino_acid","v_gene","j_gene")]
+
+
+data <- unique(Pt03_Ax_KTx)
+
+data2 <- data %>%
+  mutate(v_gene = str_remove_all(.$v_gene, "C")) %>%
+  mutate(v_gene = na_if(.$v_gene, "unresolved")) %>%
+  mutate(j_gene = str_remove_all(.$j_gene, "C")) %>%
+  mutate(j_gene = na_if(.$j_gene, "unresolved")) %>%
+  distinct(amino_acid, v_gene, j_gene, .keep_all = TRUE)
+
+data3 <- data.frame(CDR3b = data2$amino_acid,
+                    TRBV = data2$v_gene,
+                    TRBJ = data2$j_gene,
+                    CDR3a = NA,
+                    "subject.condition" = NA,
+                    count = NA)
+
+write_tsv(data3, "Pt03_Ax_KTx GLIPH2.tsv", col_names = FALSE)
+
+##run GLIPH2 for Pt03_Ax_KTx GLIPH2.tsv
+#in Mac terminal /Users/jianing/Desktop/GLIPH2/irtools.osx -c paraPt03_Ax_KTx
+Jianings-MacBook-Air:~ jianing$ cd ./Desktop/GLIPH2/
+  
+Jianings-MacBook-Air:GLIPH2 jianing$ chmod a+x irtools.osx
+Jianings-MacBook-Air:GLIPH2 jianing$ ./irtools.osx
+
+Jianings-MacBook-Air:GLIPH2 jianing$ /Users/jianing/Desktop/GLIPH2/irtools.osx -c paraPt03_Ax_KTx
+
+Run network analysis on sample
+100% [||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||] 
+(NOTE: 0mins)
+
+Evaluate statistical significance of cluster
+100% [||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||]
+(NOTE: 1min)
+
+Sort cluster by pvalue
+100% [||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||]
+Done GLIPH analysis!
+(NOTE: <1min)
+
+
+#read table Pt03_Ax_KTx_cluster
+Pt03_Ax_KTx_cluster <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pt03_Ax_KTx GLIPH2/Pt03_Ax_KTx_cluster.csv")
+
+
+##data wash (from 3131 objects to 1077 objects)
+Pt03_Ax_KTx_cluster<- Pt03_Ax_KTx_cluster[Pt03_Ax_KTx_cluster$vb_score < 0.05 & Pt03_Ax_KTx_cluster$length_score < 0.05, c("index","pattern","vb_score","length_score","TcRb","V","J")]
+
+aaaa <- as.data.frame(table(factor(Pt03_Ax_KTx_cluster$pattern)))
+#use index instead of pattern to be unique
+aaaa <- as.data.frame(table(factor(Pt03_Ax_KTx_cluster$index)))
+
+Pt03_Ax_KTx <- COVID.in.SOT_01022022[COVID.in.SOT_01022022$sample_name %in% c("Pt03_Ax_KTx_Heart","Pt03_Ax_KTx_Kidney_Allo","Pt03_Ax_KTx_Kidney_Native+Liver", "Pt03_Ax_KTx_Lung"), c("bio_identity", "amino_acid","v_gene","j_gene")]
+data <- unique(Pt03_Ax_KTx)
+Pt03_Ax_KTx <- data %>%
+  mutate(v_gene = str_remove_all(.$v_gene, "C")) %>%
+  mutate(v_gene = na_if(.$v_gene, "unresolved")) %>%
+  mutate(j_gene = str_remove_all(.$j_gene, "C")) %>%
+  mutate(j_gene = na_if(.$j_gene, "unresolved")) %>%
+  distinct(amino_acid, v_gene, j_gene, .keep_all = TRUE)
+colnames(Pt03_Ax_KTx) <- c("bio_identity","TcRb","V","J")
+Pt03_Ax_KTx_cluster <- left_join(Pt03_Ax_KTx_cluster,Pt03_Ax_KTx)
+
+#Joining, by = c("TcRb", "V", "J")
+#left_join is to add "bio_identity" column from "Pt03_Ax_KTx" to "Pt03_Ax_KTx_cluster", for rows only shown in "Pt03_Ax_KTx_cluster"
+# by() is equal to by("TcRb","V","J"), which use all common columns; can also choose by ("TcRb"), by("V"), or by("J ")
+
+
+write_tsv(Pt03_Ax_KTx_cluster, "Pt03_Ax_KTx_cluster with bio_identity 01102022.tsv", col_names = TRUE)
+
+
+
+
+MIRA.Sars.Cov2.combined_remove.unproductive <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/MIRA Sars-Cov2 combined_remove unproductive.csv")
+
+MIRA.Sars.Cov2 <- unique(MIRA.Sars.Cov2.combined_remove.unproductive)
+
+Pt03_Ax_KTx_cluster.with.bio_identity.01102022 <- read.delim("~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pt03_Ax_KTx_cluster with bio_identity 01102022.tsv")
+
+
+Pt03_Ax_KTx_cluster.with.bio_identity.01102022 <- left_join(Pt03_Ax_KTx_cluster.with.bio_identity.01102022, MIRA.Sars.Cov2)
+
+#Joining, by = "bio_identity"
+
+COVID19.associated <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/COVID search tool.csv")
+
+COVID19.associated <- unique(COVID19.associated)
+
+Pt03_Ax_KTx_cluster.with.bio_identity.01102022 <- left_join(Pt03_Ax_KTx_cluster.with.bio_identity.01102022, COVID19.associated)
+
+
+productive.frequency <- read.delim("~/Desktop/COVID TCR in SOT/CombinedRearrangements_12-27-2021_productive frequency_bioidentity_JF.tsv")
+
+Pt03_Ax_KTx_cluster.with.bio_identity.01102022 <- left_join(Pt03_Ax_KTx_cluster.with.bio_identity.01102022, productive.frequency)
+
+write.table(Pt03_Ax_KTx_cluster.with.bio_identity.01102022,file ='~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pt03_Ax_KTx_cluster_MIRA.Sars.Cov2_COVID19.associated_01102022.tsv',quote=F,row.names=F,col.names=T, sep="\t")
+
+
+
+Pt03.COVID.hits <- read.csv("~/Desktop/Pt03 COVID hits.csv")
+peptide.detail.ci <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/peptide-detail-ci_V2.csv")
+peptide.detail.ci <- unique(peptide.detail.ci)
+Pt03.COVID.hits <- unique(Pt03.COVID.hits)
+
+Pt03.COVID.hits <- left_join(Pt03.COVID.hits, peptide.detail.ci)
+Joining, by = "TCR.Bioidentity"
+
+write.table(Pt03.COVID.hits,file ='~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pt03.COVID.hits.tsv',quote=F,row.names=F,col.names=T, sep="\t")
+
+
+Pt03.COVID.hits.ci.cii <- read.delim("~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pt03.COVID.hits.ci.cii.tsv")
+subject.metadata <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/ImmuneCODE-MIRA-Release002.1/subject-metadata.csv")
+
+Pt03.COVID.hits.ci.cii <- left_join(Pt03.COVID.hits.ci.cii, subject.metadata)
+Joining, by = "Experiment"
+
+write.table(Pt03.COVID.hits.ci.cii,file ='~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pt03.COVID.hits.ci.cii.Experiment.tsv',quote=F,row.names=F,col.names=T, sep="\t")
+
+
+#Pts04,05,06 HLA tables
+data <- read.delim("~/Desktop/COVID TCR in SOT/CombinedRearrangements_12-27-2021_productive frequency_bioidentity_JF.tsv")
+
+Pts456.COVID.hits.allo <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pts456 COVID hits allo.csv")
+peptide.detail.ci <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/peptide-detail-ci_V2.csv")
+peptide.detail.ci <- unique(peptide.detail.ci)
+Pts456.COVID.hits.allo <- unique(Pts456.COVID.hits.allo)
+
+Pts456.COVID.hits.allo <- left_join(Pts456.COVID.hits.allo, data)
+Joining, by = "bio_identity"
+
+write.table(Pts456.COVID.hits.allo,file ='~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pts456.COVID.hits.allo.tsv',quote=F,row.names=F,col.names=T, sep="\t")
+
+#keep only necessary columns
+
+Pts456.COVID.hits.allo <- read.delim("~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pts456.COVID.hits.allo.tsv")
+
+Pts456.COVID.hits.allo <- left_join(Pts456.COVID.hits.allo, peptide.detail.ci)
+Joining, by = "bio_identity"
+
+write.table(Pts456.COVID.hits.allo,file ='~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pts456.COVID.hits.allo.ci.tsv',quote=F,row.names=F,col.names=T, sep="\t")
+
+#manually add experimental info for peptide.detail.cii
+
+Pts456.COVID.hits.allo.ci.cii <- read.delim("~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pts456.COVID.hits.allo.ci.cii.tsv")
+subject.metadata <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/ImmuneCODE-MIRA-Release002.1/subject-metadata.csv")
+
+Pts456.COVID.hits.allo.ci.cii<- left_join(Pts456.COVID.hits.allo.ci.cii, subject.metadata)
+Joining, by = "Experiment"
+
+write.table(Pts456.COVID.hits.allo.ci.cii,file ='~/Desktop/GLIPH2/COVID in SOT GLIPH2/Pts456.COVID.hits.allo.ci.cii.Experiment.tsv',quote=F,row.names=F,col.names=T, sep="\t")
+
+
+
+
+#integrated table
+
+MIRA.Sars.Cov2.combined_remove.unproductive <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/MIRA Sars-Cov2 combined_remove unproductive.csv")
+
+MIRA.Sars.Cov2 <- unique(MIRA.Sars.Cov2.combined_remove.unproductive)
+
+productive.frequency <- read.delim("~/Desktop/COVID TCR in SOT/CombinedRearrangements_12-27-2021_productive frequency_bioidentity_JF.tsv")
+
+
+productive.frequency <- left_join(productive.frequency, MIRA.Sars.Cov2)
+
+#Joining, by = "bio_identity"
+
+COVID19.associated <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/COVID search tool.csv")
+
+COVID19.associated <- unique(COVID19.associated)
+
+productive.frequency <- left_join(productive.frequency, COVID19.associated)
+#Joining, by = "bio_identity"
+
+peptide.detail.ci <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/peptide-detail-ci_V2.csv")
+peptide.detail.ci <- unique(peptide.detail.ci)
+
+
+productive.frequency <- left_join(productive.frequency, peptide.detail.ci)
+
+#Joining, by = "bio_identity"
+
+subject.metadata <- read.csv("~/Desktop/GLIPH2/COVID in SOT GLIPH2/ImmuneCODE-MIRA-Release002.1/subject-metadata.csv")
+
+productive.frequency <- left_join(productive.frequency, subject.metadata)
+
+Joining, by = "Experiment"
+
+
+write.table(productive.frequency,file ='~/Desktop/GLIPH2/COVID in SOT GLIPH2/integrated all.tsv',quote=F,row.names=F,col.names=T, sep="\t")
